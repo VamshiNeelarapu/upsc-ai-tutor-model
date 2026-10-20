@@ -49,6 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser().finally(() => setLoading(false));
   }, [refreshUser]);
 
+  const assertSessionStored = async () => {
+    const res = await fetch("/api/me", { credentials: "same-origin" });
+    if (!res.ok) {
+      throw new Error(
+        "Signed in, but your browser did not keep the session cookie. Turn off private browsing or cookie blocking, open the site in Chrome or Safari directly (not inside another app), and use HTTPS."
+      );
+    }
+  };
+
   const login = async (email: string, password: string) => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
@@ -62,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
+    await assertSessionStored();
     setUser(data.user);
   };
 
@@ -78,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
+    await assertSessionStored();
     setUser(data.user);
   };
 
