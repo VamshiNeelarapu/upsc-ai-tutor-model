@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import useAuth from "@/hooks/useAuth";
@@ -9,6 +10,11 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { loading } = useAuth(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   if (loading) {
     return (
@@ -31,7 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar */}
       <Sidebar
-        isOpen={sidebarOpen || true}
+        isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
