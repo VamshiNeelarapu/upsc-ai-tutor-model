@@ -12,23 +12,17 @@ const DraftSchema = z.object({
   topicHint: z.string().optional(),
   subjectId: z.string().optional(),
   sectionId: z.string().optional(),
+  topicId: z.string().optional(),
+  model: z.string().max(100).optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth(request as unknown as Request);
 
-    // Rate limiting
     const limit = aiRateLimit(session.userId);
     if (!limit.success) {
       return apiError("Too many AI requests. Please wait a moment.", 429);
-    }
-
-    if (!process.env.AI_API_KEY) {
-      return apiError(
-        "AI is not configured. Please set AI_API_KEY in your environment variables.",
-        503
-      );
     }
 
     const body = await request.json();
@@ -38,7 +32,14 @@ export async function POST(request: NextRequest) {
       return apiError(validation.error.errors[0].message, 400);
     }
 
-    const { conversationId, topicHint, subjectId, sectionId } = validation.data;
+    const { conversationId, topicHint, subjectId, sectionId, topicId, model } = validation.data;
+
+    if (!process.env.AI_API_KEY) {
+      return apiError(
+        "AI is not configured. Please set AI_API_KEY in your environment variables.",
+        503
+      );
+    }
 
     await connectToDatabase();
 
@@ -58,13 +59,12 @@ export async function POST(request: NextRequest) {
 
     let draft;
     try {
-      draft = await generateNoteDraft(messages, topicHint);
+      draft = await generateNoteDraft(messages, topicHint, conversation.topic || undefined, model);
     } catch (aiError) {
       console.error("AI draft generation error:", aiError);
       return apiError("Failed to generate draft. Please try again.", 503);
     }
 
-    // Try to find suggested syllabus nodes
     let suggestedSubject = null;
     let suggestedSection = null;
 
@@ -103,6 +103,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-detect topicId from AI's suggestedTopic if not explicitly provided
+    let resolvedTopicId = topicId || undefined;
+    if (!resolvedTopicId && draft.suggestedTopic && suggestedSection) {
+      const topics = await SyllabusNode.find({
+        parentId: suggestedSection.id,
+        nodeType: "topic",
+      });
+      const matched = topics.find(
+        (t) =>
+          t.name.toLowerCase().includes(draft.suggestedTopic!.toLowerCase()) ||
+          draft.suggestedTopic!.toLowerCase().includes(t.name.toLowerCase())
+      );
+      if (matched) resolvedTopicId = matched._id.toString();
+    }
+
     return apiSuccess({
       draft,
       sourceConversationId: conversationId,
@@ -110,6 +125,7 @@ export async function POST(request: NextRequest) {
       suggestedSection,
       subjectId: subjectId || suggestedSubject?.id,
       sectionId: sectionId || suggestedSection?.id,
+      topicId: resolvedTopicId,
     });
   } catch (error) {
     return handleApiError(error);

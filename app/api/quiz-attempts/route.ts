@@ -62,10 +62,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth(request as unknown as Request);
-    await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const noteId = searchParams.get("noteId");
+    const noteId = searchParams.get("noteId") ?? undefined;
+
+    await connectToDatabase();
 
     const query: Record<string, unknown> = { userId: session.userId };
     if (noteId) query.noteId = noteId;

@@ -101,26 +101,25 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth(request as unknown as Request);
-    await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
-    const q = searchParams.get("q");
-    const subjectId = searchParams.get("subjectId");
-    const sectionId = searchParams.get("sectionId");
-    const revisionStatus = searchParams.get("revisionStatus");
+    const q = searchParams.get("q") ?? undefined;
+    const subjectId = searchParams.get("subjectId") ?? undefined;
+    const sectionId = searchParams.get("sectionId") ?? undefined;
+    const topicId = searchParams.get("topicId") ?? undefined;
+    const revisionStatus = searchParams.get("revisionStatus") ?? undefined;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
 
-    // Build query
+    await connectToDatabase();
+
     const query: Record<string, unknown> = { userId: session.userId };
 
     if (subjectId) query.subjectId = subjectId;
     if (sectionId) query.sectionId = sectionId;
+    if (topicId) query.topicId = topicId;
     if (revisionStatus) query.revisionStatus = revisionStatus;
-
-    if (q) {
-      query.$text = { $search: q };
-    }
+    if (q) query.$text = { $search: q };
 
     const skip = (page - 1) * limit;
 

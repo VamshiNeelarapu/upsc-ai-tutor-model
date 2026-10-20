@@ -10,6 +10,9 @@ export interface IConversation extends Document {
   userId: string;
   title: string;
   topicHint?: string;
+  subject?: string;
+  topic?: string;
+  topicId?: string;
   messages: IMessage[];
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +52,15 @@ const ConversationSchema = new Schema<IConversation>(
     topicHint: {
       type: String,
     },
+    subject: {
+      type: String,
+    },
+    topic: {
+      type: String,
+    },
+    topicId: {
+      type: String,
+    },
     messages: {
       type: [MessageSchema],
       default: [],
@@ -61,6 +73,7 @@ const ConversationSchema = new Schema<IConversation>(
 
 ConversationSchema.index({ userId: 1 });
 ConversationSchema.index({ userId: 1, updatedAt: -1 });
+ConversationSchema.index({ userId: 1, topicId: 1 });
 
 const Conversation: Model<IConversation> =
   mongoose.models.Conversation ||

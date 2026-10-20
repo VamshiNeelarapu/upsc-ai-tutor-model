@@ -48,6 +48,7 @@ export interface NotesFilters {
   q?: string;
   subjectId?: string;
   sectionId?: string;
+  topicId?: string;
   revisionStatus?: string;
   page?: number;
 }
@@ -67,6 +68,7 @@ export function useNotes() {
       if (filters.q) params.set("q", filters.q);
       if (filters.subjectId) params.set("subjectId", filters.subjectId);
       if (filters.sectionId) params.set("sectionId", filters.sectionId);
+      if (filters.topicId) params.set("topicId", filters.topicId);
       if (filters.revisionStatus) params.set("revisionStatus", filters.revisionStatus);
       if (filters.page) params.set("page", String(filters.page));
 

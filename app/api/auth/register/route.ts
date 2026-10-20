@@ -16,7 +16,6 @@ const RegisterSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  // Rate limiting
   const ip = getClientIp(request as unknown as Request);
   const limit = authRateLimit(ip);
   if (!limit.success) {
@@ -41,11 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await hashPassword(password);
-    const user = await User.create({
-      name,
-      email: email.toLowerCase(),
-      passwordHash,
-    });
+    const user = await User.create({ name, email: email.toLowerCase(), passwordHash });
 
     const token = await signJWT({
       userId: user._id.toString(),

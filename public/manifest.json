@@ -1,0 +1,9 @@
+{
+  "name": "UPSC Tracker",
+  "short_name": "UPSC",
+  "description": "Track your UPSC Class 6-12 study progress",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1419",
+  "theme_color": "#1a2332"
+}

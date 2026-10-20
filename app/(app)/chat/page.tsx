@@ -1,16 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Wand2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Send, Wand2, X, BookOpen } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import ChatMessage from "@/components/ChatMessage";
 import Button from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useChat } from "@/hooks/useChat";
 import type { NoteDraft } from "@/hooks/useChat";
+import ModelSelector from "@/components/ModelSelector";
 
 export default function NewChatPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const hint = searchParams.get("hint") || "";
+  const subject = searchParams.get("subject") || undefined;
+  const topic = searchParams.get("topic") || undefined;
+  const topicId = searchParams.get("topicId") || undefined;
+
   const {
     conversationId,
     messages,
@@ -22,9 +29,10 @@ export default function NewChatPage() {
     sendMessage,
     generateDraft,
     clearDraft,
-  } = useChat();
+  } = useChat(undefined, subject, topic, topicId);
 
   const [input, setInput] = useState("");
+  const [hintUsed, setHintUsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,21 +56,33 @@ export default function NewChatPage() {
 
   const handleReviewDraft = () => {
     if (!draft || !draftData) return;
-    const params = new URLSearchParams({
-      draft: JSON.stringify(draft),
-      sourceConversationId: draftData.sourceConversationId || "",
-      ...(draftData.subjectId && { subjectId: draftData.subjectId }),
-      ...(draftData.sectionId && { sectionId: draftData.sectionId }),
-    });
     // Store in sessionStorage to avoid URL size limits
-    sessionStorage.setItem("noteDraft", JSON.stringify({ draft, draftData }));
+    sessionStorage.setItem(
+      "noteDraft",
+      JSON.stringify({ draft, draftData: { ...draftData, topicId: draftData.topicId } })
+    );
     router.push("/notes/draft");
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* Chat panel */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Scope banner */}
+        {(topic || subject) && messages.length === 0 && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-100 text-blue-700 text-sm">
+            <BookOpen size={14} aria-hidden="true" />
+            {topic ? (
+              <span>
+                Focused on <strong>{topic}</strong>
+                {subject ? <span className="text-blue-500 font-normal"> · {subject}</span> : null}
+                {" "}— chat won't drift to other topics.
+              </span>
+            ) : (
+              <span>Focused on <strong>{subject}</strong> — replies will stay within this subject.</span>
+            )}
+          </div>
+        )}
         {/* Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
@@ -133,7 +153,11 @@ export default function NewChatPage() {
 
         {/* Input area */}
         <div className="border-t border-gray-200 bg-white p-4">
-          {/* Generate notes button (shows after AI response) */}
+          <div className="flex items-center justify-between mb-2">
+            <ModelSelector />
+          </div>
+
+          {/* Generate notes button — show whenever there are AI messages */}
           {messages.some((m) => m.role === "assistant") && (
             <div className="flex items-center gap-2 mb-3">
               <Button
@@ -151,6 +175,18 @@ export default function NewChatPage() {
                   Generating structured notes...
                 </span>
               )}
+            </div>
+          )}
+
+          {hint && !hintUsed && messages.length === 0 && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-400 mb-1">Suggested question:</p>
+              <button
+                onClick={() => { setInput(hint); setHintUsed(true); inputRef.current?.focus(); }}
+                className="text-left text-xs px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors w-full truncate"
+              >
+                {hint}
+              </button>
             </div>
           )}
 

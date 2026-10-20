@@ -17,11 +17,14 @@ export async function POST(
   try {
     const session = await requireAuth(request as unknown as Request);
 
-    // Rate limiting
     const limit = aiRateLimit(session.userId);
     if (!limit.success) {
       return apiError("Too many AI requests. Please wait a moment.", 429);
     }
+
+    const body = await request.json().catch(() => ({}));
+    const validation = QuizSchema.safeParse(body);
+    const count = validation.success ? validation.data.count : 5;
 
     if (!process.env.AI_API_KEY) {
       return apiError(
@@ -29,10 +32,6 @@ export async function POST(
         503
       );
     }
-
-    const body = await request.json().catch(() => ({}));
-    const validation = QuizSchema.safeParse(body);
-    const count = validation.success ? validation.data.count : 5;
 
     await connectToDatabase();
 
@@ -45,16 +44,13 @@ export async function POST(
       return apiError("Note not found", 404);
     }
 
-    // Try to use existing MCQs first, then generate new ones
     const existingMcqs = note.content.mcqs || [];
 
     if (existingMcqs.length >= count) {
-      // Shuffle and return existing
       const shuffled = [...existingMcqs].sort(() => Math.random() - 0.5);
       return apiSuccess({ questions: shuffled.slice(0, count) });
     }
 
-    // Generate new questions
     const noteContent: StudyNoteContent = {
       title: note.title,
       overview: note.content.overview,
@@ -75,7 +71,6 @@ export async function POST(
     } catch (aiError) {
       console.error("Quiz generation error:", aiError);
 
-      // Fall back to existing MCQs if AI fails
       if (existingMcqs.length > 0) {
         return apiSuccess({ questions: existingMcqs });
       }

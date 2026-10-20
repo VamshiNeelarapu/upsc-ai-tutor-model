@@ -38,25 +38,25 @@ Before changing code, inspect the repository, identify the current stack and exi
 
 ### Required features
 
-- [ ] Register, log in, log out, and protect authenticated routes.
-- [ ] Dashboard showing subjects, recently studied topics, and recently updated notes.
-- [ ] Fixed UPSC syllabus folder hierarchy.
-- [ ] AI chat interface with conversation history.
-- [ ] AI tutor answers UPSC-focused questions and supports follow-up questions.
-- [ ] “Generate study notes” action for a topic or conversation.
-- [ ] Structured notes: concepts, Prelims facts, Mains points, revision tips, practice questions, and sources/references when available.
-- [ ] Map generated notes to a subject, section, and topic.
-- [ ] Review screen showing the note and proposed changes before saving.
-- [ ] Save a new note or update an existing note without creating duplicates for the same topic unnecessarily.
-- [ ] Browse folders and open saved notes.
-- [ ] Search notes by title, topic, and content.
-- [ ] Edit and delete notes with confirmation.
-- [ ] Generate a quiz from saved notes.
-- [ ] Show quiz answers and explanations; record attempts and scores.
-- [ ] Basic revision status: Not started, Learning, Needs revision, and Revised.
-- [ ] Responsive layout usable on desktop and mobile.
-- [ ] Loading, empty, success, and error states.
-- [ ] Environment-variable example file and setup instructions.
+- [x] Register, log in, log out, and protect authenticated routes.
+- [x] Dashboard showing subjects, recently studied topics, and recently updated notes.
+- [x] Fixed UPSC syllabus folder hierarchy.
+- [x] AI chat interface with conversation history.
+- [x] AI tutor answers UPSC-focused questions and supports follow-up questions.
+- [x] “Generate study notes” action for a topic or conversation.
+- [x] Structured notes: concepts, Prelims facts, Mains points, revision tips, practice questions, and sources/references when available.
+- [x] Map generated notes to a subject, section, and topic.
+- [x] Review screen showing the note and proposed changes before saving.
+- [x] Save a new note or update an existing note without creating duplicates for the same topic unnecessarily.
+- [x] Browse folders and open saved notes.
+- [x] Search notes by title, topic, and content.
+- [x] Edit and delete notes with confirmation.
+- [x] Generate a quiz from saved notes.
+- [x] Show quiz answers and explanations; record attempts and scores.
+- [x] Basic revision status: Not started, Learning, Needs revision, and Revised.
+- [x] Responsive layout usable on desktop and mobile.
+- [x] Loading, empty, success, and error states.
+- [x] Environment-variable example file and setup instructions.
 
 ### Later features — do not block the MVP on these
 
@@ -266,15 +266,15 @@ Validate all request bodies and enforce ownership checks on every user-specific 
 
 ## 10. UI pages
 
-- [ ] Login / registration
-- [ ] Main dashboard
-- [ ] Chat workspace
-- [ ] Syllabus/folder explorer
-- [ ] Notes list and search
-- [ ] Note reader/editor
-- [ ] Note draft review and update comparison
-- [ ] Quiz mode and results
-- [ ] Basic account/settings page
+- [x] Login / registration
+- [x] Main dashboard
+- [x] Chat workspace
+- [x] Syllabus/folder explorer
+- [x] Notes list and search
+- [x] Note reader/editor
+- [x] Note draft review and update comparison
+- [x] Quiz mode and results
+- [x] Basic account/settings page
 
 Suggested chat layout:
 

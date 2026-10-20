@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useChat } from "@/hooks/useChat";
 import type { ChatMessage as ChatMsg, NoteDraft } from "@/hooks/useChat";
+import ModelSelector from "@/components/ModelSelector";
 
 interface ConversationPageProps {
   params: { conversationId: string };
@@ -31,6 +32,7 @@ export default function ConversationPage({ params }: ConversationPageProps) {
 
   const [input, setInput] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
+  const [conversationTopic, setConversationTopic] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -44,6 +46,7 @@ export default function ConversationPage({ params }: ConversationPageProps) {
           return;
         }
         const data = await res.json();
+        setConversationTopic(data.topic || null);
         setMessages(
           data.messages.map((m: ChatMsg) => ({
             role: m.role,
@@ -106,9 +109,9 @@ export default function ConversationPage({ params }: ConversationPageProps) {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* Chat panel */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Conversation header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
           <div>
@@ -162,6 +165,10 @@ export default function ConversationPage({ params }: ConversationPageProps) {
 
         {/* Input */}
         <div className="border-t border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-2">
+            <ModelSelector />
+          </div>
+
           {messages.some((m) => m.role === "assistant") && (
             <div className="flex items-center gap-2 mb-3">
               <Button
@@ -174,6 +181,11 @@ export default function ConversationPage({ params }: ConversationPageProps) {
                 <Wand2 size={14} aria-hidden="true" />
                 Generate Study Notes
               </Button>
+              {conversationTopic && (
+                <span className="text-xs text-gray-400">
+                  Topic: <span className="font-medium text-gray-600">{conversationTopic}</span>
+                </span>
+              )}
             </div>
           )}
 

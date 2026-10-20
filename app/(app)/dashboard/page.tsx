@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageSquare, FileText, Plus, TrendingUp } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MessageSquare, FileText, Plus, TrendingUp, Sparkles } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import { RevisionBadge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -26,6 +27,7 @@ interface SubjectCard {
   id: string;
   name: string;
   slug: string;
+  nodeType: string;
   children: { id: string; name: string }[];
 }
 
@@ -55,7 +57,7 @@ export default function DashboardPage() {
         }
         if (syllabusRes.ok) {
           const data = await syllabusRes.json();
-          setSubjects(Array.isArray(data) ? data.filter((n: SubjectCard) => !n.slug.includes("-")) : []);
+          setSubjects(Array.isArray(data) ? data.filter((n: SubjectCard) => n.nodeType === "subject") : []);
         }
       } catch {
         // Silently fail - show empty state
@@ -253,9 +255,14 @@ export default function DashboardPage() {
         </section>
       </div>
 
+      {/* General chat entry */}
+      <section className="mt-8 mb-8">
+        <GeneralChatCard />
+      </section>
+
       {/* Subjects grid */}
       {subjects.length > 0 && (
-        <section className="mt-8" aria-labelledby="subjects-heading">
+        <section aria-labelledby="subjects-heading">
           <h2
             id="subjects-heading"
             className="text-lg font-semibold text-gray-900 mb-4"
@@ -263,33 +270,89 @@ export default function DashboardPage() {
             UPSC Syllabus Subjects
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {subjects.map((subject, i) => (
-              <Link
-                key={subject.id}
-                href={`/notes?subjectId=${subject.id}`}
-                className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow group"
-              >
+            {subjects.map((subject, i) => {
+              const chatHint = encodeURIComponent(
+                `I want to study ${subject.name} for UPSC. What are the most important topics I should focus on, and how should I approach this subject for both Prelims and Mains?`
+              );
+              const chatSubject = encodeURIComponent(subject.name);
+              return (
                 <div
-                  className={`w-10 h-10 rounded-lg ${subjectColors[i % subjectColors.length]} flex items-center justify-center mb-3`}
-                  aria-hidden="true"
+                  key={subject.id}
+                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow flex flex-col gap-3"
                 >
-                  <span className="text-white text-lg font-bold">
-                    {subject.name.charAt(0)}
-                  </span>
+                  <Link href={`/notes?subjectId=${subject.id}`} className="group flex-1">
+                    <div
+                      className={`w-10 h-10 rounded-lg ${subjectColors[i % subjectColors.length]} flex items-center justify-center mb-3`}
+                      aria-hidden="true"
+                    >
+                      <span className="text-white text-lg font-bold">
+                        {subject.name.charAt(0)}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                      {subject.name}
+                    </h3>
+                    {subject.children.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {subject.children.length} sections
+                      </p>
+                    )}
+                  </Link>
+                  <Link
+                    href={`/chat?hint=${chatHint}&subject=${chatSubject}`}
+                    className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium border border-blue-100 hover:border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg px-2.5 py-1.5 transition-colors"
+                  >
+                    <Sparkles size={11} aria-hidden="true" />
+                    Ask AI
+                  </Link>
                 </div>
-                <h3 className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {subject.name}
-                </h3>
-                {subject.children.length > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    {subject.children.length} sections
-                  </p>
-                )}
-              </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+function GeneralChatCard() {
+  const router = useRouter();
+  const [input, setInput] = useState("");
+
+  const start = () => {
+    const q = input.trim();
+    if (q) {
+      router.push(`/chat?hint=${encodeURIComponent(q)}`);
+    } else {
+      router.push("/chat");
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 text-white">
+      <div className="flex items-center gap-2 mb-1">
+        <MessageSquare size={18} className="text-blue-400" />
+        <h2 className="text-base font-semibold">General Chat</h2>
+      </div>
+      <p className="text-slate-400 text-sm mb-4">
+        Ask anything — not tied to any subject. Use it like ChatGPT.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && start()}
+          placeholder="Ask anything…"
+          className="flex-1 bg-slate-700 text-white placeholder-slate-400 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <button
+          onClick={start}
+          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0"
+        >
+          Chat →
+        </button>
+      </div>
     </div>
   );
 }

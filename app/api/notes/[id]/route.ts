@@ -67,6 +67,7 @@ export async function GET(
 ) {
   try {
     const session = await requireAuth(request as unknown as Request);
+
     await connectToDatabase();
 
     const note = await StudyNote.findOne({
@@ -146,6 +147,7 @@ export async function DELETE(
 ) {
   try {
     const session = await requireAuth(request as unknown as Request);
+
     await connectToDatabase();
 
     const note = await StudyNote.findOneAndDelete({

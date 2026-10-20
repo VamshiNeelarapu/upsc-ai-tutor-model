@@ -12,7 +12,6 @@ const LoginSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  // Rate limiting
   const ip = getClientIp(request as unknown as Request);
   const limit = authRateLimit(ip);
   if (!limit.success) {

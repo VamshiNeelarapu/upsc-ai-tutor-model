@@ -9,6 +9,7 @@ export async function GET(
 ) {
   try {
     const session = await requireAuth(request as unknown as Request);
+
     await connectToDatabase();
 
     const conversation = await Conversation.findOne({
@@ -24,6 +25,9 @@ export async function GET(
       id: conversation._id.toString(),
       title: conversation.title,
       topicHint: conversation.topicHint,
+      subject: conversation.subject,
+      topic: conversation.topic,
+      topicId: conversation.topicId,
       messages: conversation.messages,
       updatedAt: conversation.updatedAt,
       createdAt: conversation.createdAt,
@@ -39,6 +43,7 @@ export async function DELETE(
 ) {
   try {
     const session = await requireAuth(request as unknown as Request);
+
     await connectToDatabase();
 
     const conversation = await Conversation.findOneAndDelete({

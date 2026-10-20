@@ -15,10 +15,26 @@ interface DraftSession {
   draftData: {
     subjectId?: string;
     sectionId?: string;
+    topicId?: string;
     suggestedSubject?: { id: string; name: string; slug: string } | null;
     suggestedSection?: { id: string; name: string; slug: string } | null;
     sourceConversationId?: string;
   };
+}
+
+const STOP_WORDS = new Set(["the", "a", "an", "of", "in", "on", "at", "to", "for", "and", "or", "its", "their", "with", "by"]);
+
+function getSignificantWords(title: string): Set<string> {
+  return new Set(
+    title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+  );
+}
+
+function titleSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  const intersection = [...a].filter((w) => b.has(w)).length;
+  const union = new Set([...a, ...b]).size;
+  return intersection / union;
 }
 
 export default function DraftReviewPage() {
@@ -27,8 +43,11 @@ export default function DraftReviewPage() {
   const [title, setTitle] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [sectionId, setSectionId] = useState("");
+  const [topicId, setTopicId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [merging, setMerging] = useState(false);
   const [error, setError] = useState("");
+  const [existingNote, setExistingNote] = useState<{ id: string; title: string; isFuzzyMatch?: boolean } | null>(null);
   const [syllabus, setSyllabus] = useState<
     Array<{
       id: string;
@@ -51,6 +70,35 @@ export default function DraftReviewPage() {
       setTitle(parsed.draft.title || "");
       setSubjectId(parsed.draftData.subjectId || parsed.draftData.suggestedSubject?.id || "");
       setSectionId(parsed.draftData.sectionId || parsed.draftData.suggestedSection?.id || "");
+      setTopicId(parsed.draftData.topicId || "");
+
+      // Check for existing note with same topicId
+      if (parsed.draftData.topicId) {
+        fetch(`/api/notes?topicId=${encodeURIComponent(parsed.draftData.topicId)}&limit=1`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.notes?.length > 0) {
+              const found = data.notes[0];
+              setExistingNote({ id: found.id, title: found.title });
+            }
+          })
+          .catch(() => {});
+      } else if (parsed.draft.title) {
+        // No topicId — check title similarity to detect accidental duplicates
+        fetch(`/api/notes?q=${encodeURIComponent(parsed.draft.title)}&limit=5`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (!data?.notes?.length) return;
+            const draftWords = getSignificantWords(parsed.draft.title);
+            for (const note of data.notes) {
+              if (titleSimilarity(draftWords, getSignificantWords(note.title)) > 0.5) {
+                setExistingNote({ id: note.id, title: note.title, isFuzzyMatch: true });
+                break;
+              }
+            }
+          })
+          .catch(() => {});
+      }
     } catch {
       router.push("/chat");
     }
@@ -66,6 +114,50 @@ export default function DraftReviewPage() {
 
   const sections = syllabus.find((s) => s.id === subjectId)?.children || [];
 
+  const handleMerge = async () => {
+    if (!session || !existingNote) return;
+    setMerging(true);
+    setError("");
+
+    try {
+      const mergeContent = {
+        overview: session.draft.overview,
+        coreConcepts: session.draft.coreConcepts,
+        prelimsFacts: session.draft.prelimsFacts,
+        mainsPoints: session.draft.mainsPoints,
+        revisionTips: session.draft.revisionTips,
+        commonConfusions: session.draft.commonConfusions,
+        mcqs: session.draft.mcqs.map((m) => ({
+          ...m,
+          sourceStatus: m.sourceStatus || "generated",
+        })),
+        mainsQuestions: session.draft.mainsQuestions,
+        references: session.draft.references.map((r) => ({
+          ...r,
+          verificationStatus: r.verificationStatus || "unverified",
+        })),
+      };
+
+      const res = await fetch(`/api/notes/${existingNote.id}/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: mergeContent }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to merge note");
+      }
+
+      sessionStorage.removeItem("noteDraft");
+      router.push(`/notes/${existingNote.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to merge note");
+    } finally {
+      setMerging(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!session || !title) return;
     setSaving(true);
@@ -76,6 +168,7 @@ export default function DraftReviewPage() {
         title,
         subjectId: subjectId || undefined,
         sectionId: sectionId || undefined,
+        topicId: topicId || undefined,
         examRelevance: session.draft.examRelevance || ["prelims", "mains"],
         content: {
           overview: session.draft.overview,
@@ -183,6 +276,37 @@ export default function DraftReviewPage() {
           </Button>
         </div>
       </div>
+
+      {/* Existing note notice */}
+      {existingNote && (
+        <div className="mb-4 px-4 py-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-900 mb-1 font-medium">
+            {existingNote.isFuzzyMatch ? "A similar note already exists" : "Existing note found for this topic"}
+          </p>
+          <p className="text-sm text-amber-800 mb-3">
+            {existingNote.isFuzzyMatch
+              ? <>Looks like you may already have notes on this: <strong>{existingNote.title}</strong>. Update it instead of creating a duplicate?</>
+              : <>This topic already has a saved note: <strong>{existingNote.title}</strong></>
+            }
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              onClick={handleMerge}
+              loading={merging}
+            >
+              Update existing note
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setExistingNote(null)}
+            >
+              Save as new note
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">

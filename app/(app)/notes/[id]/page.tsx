@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,6 +9,7 @@ import {
   Brain,
   ArrowLeft,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { RevisionBadge } from "@/components/ui/Badge";
@@ -38,6 +39,20 @@ export default function NoteDetailPage({
   >({});
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pdfDropdownOpen, setPdfDropdownOpen] = useState(false);
+  const pdfDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (pdfDropdownRef.current && !pdfDropdownRef.current.contains(e.target as Node)) {
+        setPdfDropdownOpen(false);
+      }
+    }
+    if (pdfDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pdfDropdownOpen]);
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -174,6 +189,41 @@ export default function NoteDetailPage({
                 Edit
               </Button>
             </Link>
+
+            {/* Download PDF dropdown */}
+            <div className="relative" ref={pdfDropdownRef}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPdfDropdownOpen((o) => !o)}
+              >
+                <Download size={14} aria-hidden="true" />
+                Download PDF
+                <ChevronDown size={12} aria-hidden="true" />
+              </Button>
+              {pdfDropdownOpen && (
+                <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      window.open(`/notes/${params.id}/print?mode=full`, "_blank");
+                      setPdfDropdownOpen(false);
+                    }}
+                  >
+                    Full Notes PDF
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      window.open(`/notes/${params.id}/print?mode=revision`, "_blank");
+                      setPdfDropdownOpen(false);
+                    }}
+                  >
+                    Revision Sheet PDF
+                  </button>
+                </div>
+              )}
+            </div>
             <Button
               variant="danger"
               size="sm"

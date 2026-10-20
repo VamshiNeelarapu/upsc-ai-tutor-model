@@ -3,19 +3,22 @@ import { z } from "zod";
 import connectToDatabase from "@/lib/db";
 import Conversation from "@/models/Conversation";
 import { requireAuth, apiError, apiSuccess, handleApiError } from "@/lib/api-utils";
-import { chat, UPSC_SYSTEM_PROMPT, Message } from "@/lib/ai";
+import { chat, UPSC_SYSTEM_PROMPT, Message, buildSubjectSystemPrompt } from "@/lib/ai";
 import { aiRateLimit } from "@/lib/rate-limit";
 
 const ChatSchema = z.object({
   message: z.string().min(1, "Message is required").max(5000),
   conversationId: z.string().optional(),
+  subject: z.string().max(100).optional(),
+  topic: z.string().max(150).optional(),
+  topicId: z.string().max(100).optional(),
+  model: z.string().max(100).optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth(request as unknown as Request);
 
-    // Rate limiting
     const limit = aiRateLimit(session.userId);
     if (!limit.success) {
       return apiError("Too many AI requests. Please wait a moment.", 429);
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
       return apiError(validation.error.errors[0].message, 400);
     }
 
-    const { message, conversationId } = validation.data;
+    const { message, conversationId, subject, topic, topicId, model } = validation.data;
 
     await connectToDatabase();
 
@@ -42,34 +45,33 @@ export async function POST(request: NextRequest) {
         return apiError("Conversation not found", 404);
       }
     } else {
-      // Create new conversation with title from first message
-      const title =
-        message.length > 60 ? message.substring(0, 60) + "..." : message;
+      const title = message.length > 60 ? message.substring(0, 60) + "..." : message;
       conversation = await Conversation.create({
         userId: session.userId,
         title,
+        subject,
+        topic,
+        topicId,
         messages: [],
       });
     }
 
-    // Add user message
     conversation.messages.push({
       role: "user",
       content: message,
       timestamp: new Date(),
     });
 
-    // Build message history for AI
+    const activeSubject = subject || conversation.subject;
+    const activeTopic = topic || conversation.topic;
     const aiMessages: Message[] = [
-      { role: "system", content: UPSC_SYSTEM_PROMPT },
+      { role: "system", content: buildSubjectSystemPrompt(activeSubject, activeTopic) },
       ...conversation.messages.slice(-20).map((m) => ({
-        // Last 20 messages for context
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
     ];
 
-    // Check if AI is configured
     if (!process.env.AI_API_KEY) {
       return apiError(
         "AI is not configured. Please set AI_API_KEY in your environment variables.",
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     let aiResponse: string;
     try {
-      aiResponse = await chat(aiMessages);
+      aiResponse = await chat(aiMessages, { model });
     } catch (aiError) {
       console.error("AI error:", aiError);
       const errorMessage =
@@ -98,7 +100,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add assistant response
     conversation.messages.push({
       role: "assistant",
       content: aiResponse,

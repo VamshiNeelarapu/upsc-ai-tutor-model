@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { getStoredModel } from "@/lib/models";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -40,8 +40,7 @@ export interface NoteDraft {
   suggestedSection?: string;
 }
 
-export function useChat(initialConversationId?: string) {
-  const router = useRouter();
+export function useChat(initialConversationId?: string, subject?: string, topic?: string, topicId?: string) {
   const [conversationId, setConversationId] = useState<string | undefined>(
     initialConversationId
   );
@@ -53,6 +52,7 @@ export function useChat(initialConversationId?: string) {
   const [draftData, setDraftData] = useState<{
     subjectId?: string;
     sectionId?: string;
+    topicId?: string;
     suggestedSubject?: { id: string; name: string; slug: string } | null;
     suggestedSection?: { id: string; name: string; slug: string } | null;
     sourceConversationId?: string;
@@ -76,7 +76,15 @@ export function useChat(initialConversationId?: string) {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: content, conversationId }),
+          body: JSON.stringify({
+            message: content,
+            conversationId,
+            model: getStoredModel(),
+            // Only send subject/topic on the very first message (when conversation doesn't exist yet)
+            ...(!conversationId && subject ? { subject } : {}),
+            ...(!conversationId && topic ? { topic } : {}),
+            ...(!conversationId && topicId ? { topicId } : {}),
+          }),
         });
 
         if (!res.ok) {
@@ -95,9 +103,9 @@ export function useChat(initialConversationId?: string) {
 
         setMessages((prev) => [...prev, assistantMessage]);
 
-        // Update URL with conversation ID
+        // Update URL silently — no navigation, component stays mounted
         if (!initialConversationId && data.conversationId) {
-          router.replace(`/chat/${data.conversationId}`);
+          window.history.replaceState(null, "", `/chat/${data.conversationId}`);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to send message");
@@ -107,7 +115,7 @@ export function useChat(initialConversationId?: string) {
         setLoading(false);
       }
     },
-    [conversationId, initialConversationId, router]
+    [conversationId, initialConversationId, subject, topic, topicId]
   );
 
   const generateDraft = useCallback(async () => {
@@ -123,7 +131,7 @@ export function useChat(initialConversationId?: string) {
       const res = await fetch("/api/notes/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId }),
+        body: JSON.stringify({ conversationId, model: getStoredModel(), ...(topicId ? { topicId } : {}) }),
       });
 
       if (!res.ok) {
@@ -136,6 +144,7 @@ export function useChat(initialConversationId?: string) {
       setDraftData({
         subjectId: data.subjectId,
         sectionId: data.sectionId,
+        topicId: data.topicId,
         suggestedSubject: data.suggestedSubject,
         suggestedSection: data.suggestedSection,
         sourceConversationId: conversationId,
@@ -145,7 +154,7 @@ export function useChat(initialConversationId?: string) {
     } finally {
       setDraftLoading(false);
     }
-  }, [conversationId]);
+  }, [conversationId, topicId]);
 
   const clearDraft = useCallback(() => {
     setDraft(null);

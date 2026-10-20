@@ -47,7 +47,6 @@ const SyllabusNodeSchema = new Schema<ISyllabusNode>(
   }
 );
 
-SyllabusNodeSchema.index({ slug: 1 }, { unique: true });
 SyllabusNodeSchema.index({ parentId: 1 });
 
 const SyllabusNode: Model<ISyllabusNode> =
