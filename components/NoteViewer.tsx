@@ -145,7 +145,7 @@ export function NoteViewer({ note, className, defaultMode = "full" }: NoteViewer
           )}
 
           {/* PYQs */}
-          {(content as NoteContentWithPYQ).pyqs?.length > 0 && (
+          {((content as NoteContentWithPYQ).pyqs?.length ?? 0) > 0 && (
             <section aria-labelledby="pyqs-heading">
               <h2 id="pyqs-heading" className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
                 Previous Year Questions
@@ -364,7 +364,7 @@ export function NoteViewer({ note, className, defaultMode = "full" }: NoteViewer
           )}
 
           {/* PYQs in Quick Revision */}
-          {(content as NoteContentWithPYQ).pyqs?.length > 0 && (
+          {((content as NoteContentWithPYQ).pyqs?.length ?? 0) > 0 && (
             <section aria-labelledby="pyqs-revision-heading">
               <h2 id="pyqs-revision-heading" className="text-lg font-semibold text-gray-900 mb-1">
                 Previous Year Questions

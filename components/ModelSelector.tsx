@@ -42,7 +42,9 @@ export default function ModelSelector() {
           Free
         </span>
         {selected.dailyLimit && (
-          <Clock size={10} className="text-amber-500 flex-shrink-0" title="Has daily rate limit" />
+          <span title="Has daily rate limit" className="flex-shrink-0">
+            <Clock size={10} className="text-amber-500" />
+          </span>
         )}
         <ChevronDown size={11} className={`transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>

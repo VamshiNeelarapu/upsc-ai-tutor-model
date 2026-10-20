@@ -61,6 +61,7 @@ export async function POST(
       commonConfusions: note.content.commonConfusions,
       mcqs: note.content.mcqs,
       mainsQuestions: note.content.mainsQuestions,
+      pyqs: [],
       references: note.content.references,
       examRelevance: note.examRelevance as ("prelims" | "mains" | "csat" | "essay")[],
     };
