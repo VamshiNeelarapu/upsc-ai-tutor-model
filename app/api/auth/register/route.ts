@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
 
-    response.headers.set("Set-Cookie", createSessionCookie(token));
+    response.headers.set("Set-Cookie", createSessionCookie(token, request));
     return response;
   } catch (error) {
     console.error("Register error:", error);

@@ -75,10 +75,15 @@ export async function getSessionUserFromCookies(): Promise<JWTPayload | null> {
   }
 }
 
-export function createSessionCookie(token: string): string {
-  const isProduction = process.env.NODE_ENV === "production";
+function isHttpsRequest(request: Request): boolean {
+  const forwarded = request.headers.get("x-forwarded-proto");
+  if (forwarded) return forwarded.split(",")[0].trim() === "https";
+  return new URL(request.url).protocol === "https:";
+}
+
+export function createSessionCookie(token: string, request: Request): string {
   const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
-  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax${isProduction ? "; Secure" : ""}`;
+  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax${isHttpsRequest(request) ? "; Secure" : ""}`;
 }
 
 export function clearSessionCookie(): string {

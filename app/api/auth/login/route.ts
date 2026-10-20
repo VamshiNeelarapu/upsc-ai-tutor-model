@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    response.headers.set("Set-Cookie", createSessionCookie(token));
+    response.headers.set("Set-Cookie", createSessionCookie(token, request));
     return response;
   } catch (error) {
     console.error("Login error:", error);
