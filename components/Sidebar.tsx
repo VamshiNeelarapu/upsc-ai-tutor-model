@@ -6,10 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import {
   LayoutDashboard,
+  Newspaper,
+  CalendarRange,
+  BarChart3,
   MessageSquare,
   FileText,
   User,
-  LogOut,
   Plus,
   ChevronDown,
   ChevronRight,
@@ -33,12 +35,32 @@ interface SidebarProps {
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthContext();
+  const { user } = useAuthContext();
   const [syllabus, setSyllabus] = useState<SyllabusTreeNode[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [topicStatus, setTopicStatus] = useState<Record<string, string> | undefined>(undefined);
+  const [chatStarted, setChatStarted] = useState<Record<string, boolean> | undefined>(undefined);
   const [syllabusOpen, setSyllabusOpen] = useState(true);
-  const [conversationsOpen, setConversationsOpen] = useState(true);
-  const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [conversationsOpen, setConversationsOpen] = useState(false);
+
+  const fetchConversations = () => {
+    fetch("/api/conversations")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setConversations(data.slice(0, 5)); })
+      .catch(() => {});
+  };
+
+  const fetchTopicStatus = () => {
+    fetch("/api/notes/status-map")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.map) setTopicStatus(data.map);
+        if (data && Array.isArray(data.chatTopicIds)) {
+          setChatStarted(Object.fromEntries(data.chatTopicIds.map((id: string) => [id, true])));
+        }
+      })
+      .catch(() => {});
+  };
 
   const fetchSyllabus = () => {
     fetch("/api/syllabus")
@@ -49,22 +71,31 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   useEffect(() => {
     fetchSyllabus();
-
-    fetch("/api/conversations")
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setConversations(data.slice(0, 3)); })
-      .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLogout = async () => {
-    await logout();
-    router.push("/login");
-  };
+  useEffect(() => {
+    fetchConversations();
+    fetchTopicStatus();
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onConversationsChanged = () => {
+      fetchConversations();
+      fetchTopicStatus();
+    };
+    window.addEventListener("conversations:refresh", onConversationsChanged);
+    window.addEventListener("notes:changed", fetchTopicStatus);
+    return () => {
+      window.removeEventListener("conversations:refresh", onConversationsChanged);
+      window.removeEventListener("notes:changed", fetchTopicStatus);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/current-affairs", label: "Daily Current Affairs", icon: Newspaper },
+    { href: "/current-affairs/monthly", label: "Monthly Current Affairs", icon: CalendarRange },
     { href: "/notes", label: "My Notes", icon: FileText },
-    { href: "/account", label: "Account", icon: User },
   ];
 
   return (
@@ -103,7 +134,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               href={href}
               className={clsx(
                 "flex items-center gap-3 px-4 py-2 text-sm transition-colors mx-2 rounded-md",
-                pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
+                pathname === href || (href !== "/dashboard" && href !== "/current-affairs" && pathname.startsWith(href))
                   ? "bg-[#294032] text-[#e8f0eb]"
                   : "text-[#a0bfa8] hover:bg-[#253829] hover:text-[#e8f0eb]"
               )}
@@ -174,22 +205,40 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
         {/* Syllabus Tree */}
         <div className="px-2">
-          <button
-            onClick={() => setSyllabusOpen(!syllabusOpen)}
-            className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-semibold text-[#7a9e84] uppercase tracking-wider rounded hover:text-[#a0bfa8]"
-          >
-            <span>Syllabus</span>
-            {syllabusOpen ? (
-              <ChevronDown size={12} />
-            ) : (
-              <ChevronRight size={12} />
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSyllabusOpen(!syllabusOpen)}
+              className="flex items-center justify-between flex-1 px-2 py-1.5 text-xs font-semibold text-[#7a9e84] uppercase tracking-wider rounded hover:text-[#a0bfa8]"
+            >
+              <span>Syllabus</span>
+              {syllabusOpen ? (
+                <ChevronDown size={12} />
+              ) : (
+                <ChevronRight size={12} />
+              )}
+            </button>
+            <Link
+              href="/tracker"
+              onClick={() => onClose?.()}
+              title="Progress tracker"
+              className={clsx(
+                "flex items-center gap-1 px-2 py-1.5 rounded text-xs font-semibold uppercase tracking-wider transition-colors",
+                pathname === "/tracker"
+                  ? "bg-[#294032] text-[#e8f0eb]"
+                  : "text-[#7a9e84] hover:text-[#e8f0eb] hover:bg-[#253829]"
+              )}
+            >
+              <BarChart3 size={12} aria-hidden="true" />
+              Tracker
+            </Link>
+          </div>
 
           {syllabusOpen && (
             <div className="mt-1">
               <SyllabusTree
                 nodes={syllabus}
+                topicStatus={topicStatus}
+                chatStarted={chatStarted}
                 editable
                 onMutate={fetchSyllabus}
                 onNodeSelect={(node) => {
@@ -219,33 +268,18 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             <p className="text-xs text-[#7a9e84] truncate">{user?.email}</p>
           </div>
         </div>
-        {logoutConfirm ? (
-          <div className="rounded-md bg-[#1a2e1e] border border-[#2c4030] px-3 py-2 text-xs">
-            <p className="text-[#e8f0eb] mb-2">Sign out of UPSC AI?</p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleLogout}
-                className="flex-1 py-1 rounded bg-[#b94040] text-white font-medium hover:bg-[#9e3535] transition-colors"
-              >
-                Yes, sign out
-              </button>
-              <button
-                onClick={() => setLogoutConfirm(false)}
-                className="flex-1 py-1 rounded bg-[#253829] text-[#a0bfa8] hover:bg-[#2c4030] hover:text-[#e8f0eb] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setLogoutConfirm(true)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[#7a9e84] hover:text-[#e8f0eb] hover:bg-[#253829] rounded-md transition-colors"
-          >
-            <LogOut size={14} aria-hidden="true" />
-            Sign out
-          </button>
-        )}
+        <Link
+          href="/account"
+          onClick={() => onClose?.()}
+          aria-current={pathname.startsWith("/account") ? "page" : undefined}
+          className={clsx(
+            "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[#7a9e84] hover:text-[#e8f0eb] hover:bg-[#253829] rounded-md transition-colors",
+            pathname.startsWith("/account") && "bg-white/10 text-white"
+          )}
+        >
+          <User size={14} aria-hidden="true" />
+          Account
+        </Link>
       </div>
     </aside>
   );

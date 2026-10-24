@@ -52,7 +52,11 @@ export default function DraftReviewPage() {
     Array<{
       id: string;
       name: string;
-      children: Array<{ id: string; name: string }>;
+      children: Array<{
+        id: string;
+        name: string;
+        children?: Array<{ id: string; name: string }>;
+      }>;
     }>
   >([]);
 
@@ -72,19 +76,8 @@ export default function DraftReviewPage() {
       setSectionId(parsed.draftData.sectionId || parsed.draftData.suggestedSection?.id || "");
       setTopicId(parsed.draftData.topicId || "");
 
-      // Check for existing note with same topicId
-      if (parsed.draftData.topicId) {
-        fetch(`/api/notes?topicId=${encodeURIComponent(parsed.draftData.topicId)}&limit=1`)
-          .then((r) => r.json())
-          .then((data) => {
-            if (data?.notes?.length > 0) {
-              const found = data.notes[0];
-              setExistingNote({ id: found.id, title: found.title });
-            }
-          })
-          .catch(() => {});
-      } else if (parsed.draft.title) {
-        // No topicId — check title similarity to detect accidental duplicates
+      // No topicId — check title similarity to detect accidental duplicates
+      if (!parsed.draftData.topicId && parsed.draft.title) {
         fetch(`/api/notes?q=${encodeURIComponent(parsed.draft.title)}&limit=5`)
           .then((r) => r.json())
           .then((data) => {
@@ -113,6 +106,30 @@ export default function DraftReviewPage() {
   }, [router]);
 
   const sections = syllabus.find((s) => s.id === subjectId)?.children || [];
+  const topics = sections.find((s) => s.id === sectionId)?.children || [];
+
+  // Re-check for an existing note whenever the chosen topic changes
+  useEffect(() => {
+    if (!topicId) {
+      setExistingNote((prev) => (prev && !prev.isFuzzyMatch ? null : prev));
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/notes?topicId=${encodeURIComponent(topicId)}&limit=1`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.notes?.length > 0) {
+          setExistingNote({ id: data.notes[0].id, title: data.notes[0].title });
+        } else {
+          setExistingNote((prev) => (prev && !prev.isFuzzyMatch ? null : prev));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId]);
 
   const handleMerge = async () => {
     if (!session || !existingNote) return;
@@ -341,6 +358,7 @@ export default function DraftReviewPage() {
                     onChange={(e) => {
                       setSubjectId(e.target.value);
                       setSectionId("");
+                      setTopicId("");
                     }}
                     className="w-full h-10 appearance-none border border-gray-300 rounded-md px-3 pr-8 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     aria-label="Select subject"
@@ -367,7 +385,10 @@ export default function DraftReviewPage() {
                   <div className="relative">
                     <select
                       value={sectionId}
-                      onChange={(e) => setSectionId(e.target.value)}
+                      onChange={(e) => {
+                        setSectionId(e.target.value);
+                        setTopicId("");
+                      }}
                       className="w-full h-10 appearance-none border border-gray-300 rounded-md px-3 pr-8 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       aria-label="Select section"
                     >
@@ -375,6 +396,33 @@ export default function DraftReviewPage() {
                       {sections.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Topic selector */}
+              {topics.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Topic</label>
+                  <div className="relative">
+                    <select
+                      value={topicId}
+                      onChange={(e) => setTopicId(e.target.value)}
+                      className="w-full h-10 appearance-none border border-gray-300 rounded-md px-3 pr-8 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label="Select topic"
+                    >
+                      <option value="">No specific topic</option>
+                      {topics.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
                         </option>
                       ))}
                     </select>

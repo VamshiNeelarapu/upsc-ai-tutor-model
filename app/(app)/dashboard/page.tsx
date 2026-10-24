@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageSquare, FileText, Plus, TrendingUp, Sparkles } from "lucide-react";
+import { MessageSquare, FileText, Plus, TrendingUp, Sparkles, Newspaper } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import { RevisionBadge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -23,6 +23,11 @@ interface Note {
   updatedAt: string;
 }
 
+interface CAPreviewItem {
+  point: string;
+  division: "gs" | "static";
+}
+
 interface SubjectCard {
   id: string;
   name: string;
@@ -36,16 +41,23 @@ export default function DashboardPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [subjects, setSubjects] = useState<SubjectCard[]>([]);
+  const [caItems, setCaItems] = useState<CAPreviewItem[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [convRes, notesRes, syllabusRes] = await Promise.all([
+        const [convRes, notesRes, syllabusRes, caRes] = await Promise.all([
           fetch("/api/conversations"),
           fetch("/api/notes?limit=5"),
           fetch("/api/syllabus"),
+          fetch("/api/current-affairs"),
         ]);
+
+        if (caRes.ok) {
+          const data = await caRes.json();
+          setCaItems(data.digest ? data.digest.items : []);
+        }
 
         if (convRes.ok) {
           const data = await convRes.json();
@@ -104,20 +116,53 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <div className="flex flex-wrap gap-3 mb-8">
-        <Link href="/chat">
+      <div className="flex flex-wrap items-center gap-3 mb-8">
+        <Link href="/chat" className="flex">
           <Button size="md">
             <Plus size={16} aria-hidden="true" />
             New Chat
           </Button>
         </Link>
-        <Link href="/notes">
+        <Link href="/notes" className="flex">
           <Button variant="secondary" size="md">
             <FileText size={16} aria-hidden="true" />
             Browse Notes
           </Button>
         </Link>
       </div>
+
+      {/* Today's current affairs */}
+      <section aria-labelledby="ca-heading" className="bg-white border border-gray-200 rounded-xl p-5 mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 id="ca-heading" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Newspaper size={18} className="text-[#457a5a]" aria-hidden="true" />
+            Today&apos;s Current Affairs
+          </h2>
+          <Link href="/current-affairs" className="text-sm text-blue-600 hover:text-blue-500">
+            {caItems && caItems.length > 0 ? "See all" : "Open"}
+          </Link>
+        </div>
+        {caItems && caItems.length > 0 ? (
+          <ul className="space-y-2">
+            {caItems.slice(0, 4).map((item, i) => (
+              <li key={i} className="flex gap-2 text-sm text-gray-700">
+                <span className="text-[#457a5a] flex-shrink-0" aria-hidden="true">•</span>
+                <span className="line-clamp-2">{item.point}</span>
+              </li>
+            ))}
+            {caItems.length > 4 && (
+              <li className="text-xs text-gray-400 pl-4">+ {caItems.length - 4} more points today</li>
+            )}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">
+            Get today&apos;s news as a point-wise list, split into GS topics and Static GK.{" "}
+            <Link href="/current-affairs" className="text-blue-600 hover:text-blue-500">
+              Get today&apos;s current affairs
+            </Link>
+          </p>
+        )}
+      </section>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -329,7 +374,7 @@ function GeneralChatCard() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 text-white">
+    <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-4 sm:p-6 text-white">
       <div className="flex items-center gap-2 mb-1">
         <MessageSquare size={18} className="text-blue-400" />
         <h2 className="text-base font-semibold">General Chat</h2>
@@ -344,11 +389,11 @@ function GeneralChatCard() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && start()}
           placeholder="Ask anything…"
-          className="flex-1 bg-slate-700 text-white placeholder-slate-400 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 min-w-0 bg-slate-700 text-white placeholder-slate-400 border border-slate-600 rounded-lg px-3 sm:px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <button
           onClick={start}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0"
+          className="bg-blue-600 hover:bg-blue-500 text-white px-4 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0"
         >
           Chat →
         </button>

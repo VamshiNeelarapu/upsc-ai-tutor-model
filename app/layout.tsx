@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ErrorPopupProvider } from "@/components/ErrorPopup";
 
 export const metadata: Metadata = {
   title: "UPSC AI Study App",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ErrorPopupProvider>{children}</ErrorPopupProvider>
+        </AuthProvider>
       </body>
     </html>
   );

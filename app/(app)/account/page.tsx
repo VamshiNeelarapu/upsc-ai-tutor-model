@@ -1,13 +1,60 @@
 "use client";
 
 import { useState } from "react";
-import { User, Lock } from "lucide-react";
+import { User, Lock, Cpu, Trash2, Plus, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/contexts/AuthContext";
 import useAuth from "@/hooks/useAuth";
+import { useCustomModels } from "@/hooks/useCustomModels";
+import { AI_MODELS, MAX_CUSTOM_MODELS } from "@/lib/models";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import { OpenRouterBalance } from "@/components/OpenRouterBalance";
 
 export default function AccountPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const { logout } = useAuthContext();
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await logout();
+      router.push("/login");
+    } finally {
+      setSigningOut(false);
+    }
+  };
+  const { models: customModels, loaded: modelsLoaded, addModel, removeModel } = useCustomModels();
+  const [newModelId, setNewModelId] = useState("");
+  const [newModelLabel, setNewModelLabel] = useState("");
+  const [modelError, setModelError] = useState("");
+  const [addingModel, setAddingModel] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const handleAddModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModelError("");
+    setAddingModel(true);
+    const err = await addModel(newModelId.trim(), newModelLabel);
+    setAddingModel(false);
+    if (err) {
+      setModelError(err);
+      return;
+    }
+    setNewModelId("");
+    setNewModelLabel("");
+  };
+
+  const handleRemoveModel = async (id: string) => {
+    setModelError("");
+    setRemovingId(id);
+    const err = await removeModel(id);
+    setRemovingId(null);
+    if (err) setModelError(err);
+  };
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,15 +79,19 @@ export default function AccountPage() {
 
     setChangingPassword(true);
     try {
-      // Password change endpoint would go here
-      // For MVP, we show a success message without implementing it
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to change password.");
       setPasswordSuccess("Password changed successfully.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch {
-      setPasswordError("Failed to change password. Please try again.");
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Failed to change password. Please try again.");
     } finally {
       setChangingPassword(false);
     }
@@ -99,6 +150,127 @@ export default function AccountPage() {
         </div>
       </section>
 
+      {/* AI Models */}
+      <section
+        id="models"
+        aria-labelledby="models-heading"
+        className="bg-white border border-gray-200 rounded-xl p-6 mb-6 scroll-mt-6"
+      >
+        <h2
+          id="models-heading"
+          className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2"
+        >
+          <Cpu size={18} aria-hidden="true" />
+          AI Models
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Add any model your AI provider supports. It appears in the model picker in chat. Paid
+          models use your provider credits.
+        </p>
+
+        <OpenRouterBalance />
+
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+            Built-in
+          </p>
+          <ul className="space-y-1">
+            {AI_MODELS.map((m) => (
+              <li key={m.id} className="flex items-center justify-between text-sm">
+                <span className="text-gray-800">
+                  {m.label}
+                  <span
+                    className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      m.paid ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {m.paid ? "Paid" : "Free"}
+                  </span>
+                </span>
+                <span className="text-xs text-gray-400 truncate ml-3">{m.id}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="mb-4 pt-4 border-t border-gray-100">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+            Your models
+          </p>
+          {!modelsLoaded ? (
+            <p className="text-sm text-gray-400">Loading...</p>
+          ) : customModels.length === 0 ? (
+            <p className="text-sm text-gray-400">No custom models yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {customModels.map((m) => (
+                <li
+                  key={m.id}
+                  className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{m.label}</p>
+                    <p className="text-xs text-gray-400 truncate">{m.id}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveModel(m.id)}
+                    loading={removingId === m.id}
+                    aria-label={`Remove ${m.label}`}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <form onSubmit={handleAddModel} className="space-y-3 pt-4 border-t border-gray-100">
+          {modelError && (
+            <div
+              role="alert"
+              className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"
+            >
+              {modelError}
+            </div>
+          )}
+          <Input
+            label="Model ID"
+            value={newModelId}
+            onChange={(e) => setNewModelId(e.target.value)}
+            placeholder="e.g. anthropic/claude-3.5-sonnet"
+            hint="Copy the exact ID from your provider (for OpenRouter, the model page shows it)"
+            autoComplete="off"
+            spellCheck={false}
+            required
+          />
+          <Input
+            label="Display name (optional)"
+            value={newModelLabel}
+            onChange={(e) => setNewModelLabel(e.target.value)}
+            placeholder="e.g. Claude 3.5 Sonnet"
+            maxLength={40}
+            autoComplete="off"
+          />
+          <div className="flex items-center gap-3">
+            <Button
+              type="submit"
+              loading={addingModel}
+              disabled={!newModelId.trim() || customModels.length >= MAX_CUSTOM_MODELS}
+            >
+              <Plus size={14} aria-hidden="true" />
+              Add model
+            </Button>
+            <span className="text-xs text-gray-400">
+              {customModels.length}/{MAX_CUSTOM_MODELS} custom models
+            </span>
+          </div>
+        </form>
+      </section>
+
       {/* Change Password */}
       <section
         aria-labelledby="password-heading"
@@ -130,14 +302,16 @@ export default function AccountPage() {
             </div>
           )}
 
-          <Input
-            label="Current password"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
+          {!user?.viaMaster && (
+            <Input
+              label="Current password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          )}
 
           <Input
             label="New password"
@@ -161,11 +335,42 @@ export default function AccountPage() {
           <Button
             type="submit"
             loading={changingPassword}
-            disabled={!currentPassword || !newPassword || !confirmPassword}
+            disabled={(!user?.viaMaster && !currentPassword) || !newPassword || !confirmPassword}
           >
             Change Password
           </Button>
         </form>
+      </section>
+
+      {/* Sign out */}
+      <section
+        aria-labelledby="signout-heading"
+        className="bg-white border border-gray-200 rounded-xl p-6 mt-6"
+      >
+        <h2
+          id="signout-heading"
+          className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2"
+        >
+          <LogOut size={18} aria-hidden="true" />
+          Sign out
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">You will need to sign in again to continue studying.</p>
+        {confirmingSignOut ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-gray-700">Sign out of this device?</span>
+            <Button variant="danger" size="sm" onClick={handleSignOut} loading={signingOut}>
+              Yes, sign out
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmingSignOut(false)} disabled={signingOut}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button variant="secondary" onClick={() => setConfirmingSignOut(true)}>
+            <LogOut size={14} aria-hidden="true" />
+            Sign out
+          </Button>
+        )}
       </section>
     </div>
   );

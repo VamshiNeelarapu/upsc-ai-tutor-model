@@ -9,6 +9,9 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useChat } from "@/hooks/useChat";
 import type { ChatMessage as ChatMsg, NoteDraft } from "@/hooks/useChat";
 import ModelSelector from "@/components/ModelSelector";
+import { SAMPLE_PROMPTS, topicStudyPrompt } from "@/lib/chat-prompts";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import { useVoiceInput } from "@/hooks/useSpeechToText";
 
 interface ConversationPageProps {
   params: { conversationId: string };
@@ -20,7 +23,6 @@ export default function ConversationPage({ params }: ConversationPageProps) {
     conversationId,
     messages,
     loading,
-    error,
     draft,
     draftData,
     draftLoading,
@@ -33,8 +35,14 @@ export default function ConversationPage({ params }: ConversationPageProps) {
   const [input, setInput] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
   const [conversationTopic, setConversationTopic] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [conversationSection, setConversationSection] = useState<string | null>(null);
+  const [conversationSubject, setConversationSubject] = useState<string | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const voice = useVoiceInput({
+    setText: setInput,
+    onEnd: () => inputRef.current?.focus(),
+  });
 
   // Load existing conversation
   useEffect(() => {
@@ -47,6 +55,8 @@ export default function ConversationPage({ params }: ConversationPageProps) {
         }
         const data = await res.json();
         setConversationTopic(data.topic || null);
+        setConversationSection(data.section || null);
+        setConversationSubject(data.subject || null);
         setMessages(
           data.messages.map((m: ChatMsg) => ({
             role: m.role,
@@ -65,14 +75,20 @@ export default function ConversationPage({ params }: ConversationPageProps) {
   }, [params.conversationId, router, setMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async () => {
     const message = input.trim();
     if (!message || loading) return;
+    voice.cancel();
     setInput("");
-    await sendMessage(message);
+    const ok = await sendMessage(message);
+    if (!ok) {
+      setInput(message);
+      inputRef.current?.focus();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -109,9 +125,9 @@ export default function ConversationPage({ params }: ConversationPageProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-clip">
       {/* Chat panel */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-clip">
         {/* Conversation header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
           <div>
@@ -132,7 +148,37 @@ export default function ConversationPage({ params }: ConversationPageProps) {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto">
+          {messages.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center h-full px-4 py-16 text-center">
+              <div className="text-5xl mb-4" aria-hidden="true">🎓</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                {conversationTopic ? `Start studying ${conversationTopic}` : "This chat is empty"}
+              </h2>
+              <p className="text-gray-500 max-w-md text-sm">
+                Pick a suggestion or type your own question below.
+              </p>
+              <div
+                className={`mt-6 grid grid-cols-1 gap-2 w-full max-w-lg ${
+                  conversationTopic ? "" : "sm:grid-cols-2"
+                }`}
+              >
+                {(conversationTopic ? [topicStudyPrompt(conversationTopic, conversationSection ?? undefined, conversationSubject ?? undefined)] : SAMPLE_PROMPTS).map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => {
+                      voice.cancel();
+                      setInput(prompt);
+                      inputRef.current?.focus();
+                    }}
+                    className="text-left text-sm px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors text-gray-700"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {messages.map((message, i) => (
             <ChatMessage
               key={i}
@@ -152,16 +198,7 @@ export default function ConversationPage({ params }: ConversationPageProps) {
               </div>
             </div>
           )}
-
-          <div ref={messagesEndRef} />
         </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mx-4 mb-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-            {error}
-          </div>
-        )}
 
         {/* Input */}
         <div className="border-t border-gray-200 bg-white p-4">
@@ -193,12 +230,22 @@ export default function ConversationPage({ params }: ConversationPageProps) {
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                if (voice.listening) voice.cancel();
+                setInput(e.target.value);
+              }}
               onKeyDown={handleKeyDown}
-              placeholder="Continue the conversation..."
+              placeholder={voice.listening ? "Listening... speak now" : "Continue the conversation..."}
               className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px] max-h-32"
               rows={1}
               aria-label="Chat message input"
+              disabled={loading}
+            />
+            <VoiceInputButton
+              listening={voice.listening}
+              lang={voice.lang}
+              onLangChange={voice.setLang}
+              onToggle={() => (voice.listening ? voice.stop() : voice.start(input))}
               disabled={loading}
             />
             <Button

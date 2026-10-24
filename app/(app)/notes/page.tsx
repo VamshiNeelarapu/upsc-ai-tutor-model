@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useNotes } from "@/hooks/useNotes";
+import { topicStudyPrompt } from "@/lib/chat-prompts";
 
 const REVISION_STATUSES = [
   { value: "", label: "All" },
@@ -35,9 +36,7 @@ interface SyllabusNode {
 }
 
 function makeTopicChatUrl(topicId: string, entry: SyllabusEntry): string {
-  const hint = encodeURIComponent(
-    `I want to study "${entry.name}" for UPSC. Explain it in detail covering key facts, historical significance, Prelims points and Mains analytical dimensions.`
-  );
+  const hint = encodeURIComponent(topicStudyPrompt(entry.name, entry.parentName, entry.grandparentName));
   const subject = encodeURIComponent(entry.grandparentName || entry.parentName || "");
   const topic = encodeURIComponent(entry.name);
   return `/chat?hint=${hint}&subject=${subject}&topic=${topic}&topicId=${topicId}`;
